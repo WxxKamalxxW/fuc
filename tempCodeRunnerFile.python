@@ -1,0 +1,93 @@
+from fpdf import FPDF
+
+class InvoicePDF(FPDF):
+    def header(self):
+        # Invoice header
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'J AND T Supplies', ln=1, align='C')
+        self.set_font('Arial', '', 12)
+        self.cell(0, 10, '376 Totom Avenue, Kelowna British Columbia V1X 5Z3, Canada', ln=1, align='C')
+        self.ln(10)
+    
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, 'Page %s' % self.page_no(), align='C')
+    
+    def add_invoice_details(self, invoice_no, date, terms, due_date):
+        self.set_font('Arial', '', 12)
+        self.cell(100, 10, f'Invoice# {invoice_no}', ln=1)
+        self.cell(100, 10, f'Invoice Date: {date}', ln=1)
+        self.cell(100, 10, f'Terms: {terms}', ln=1)
+        self.cell(100, 10, f'Due Date: {due_date}', ln=1)
+        self.ln(10)
+
+    def add_billing_details(self, customer):
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, 'Bill To:', ln=1)
+        self.set_font('Arial', '', 12)
+        self.cell(0, 10, customer, ln=1)
+        self.ln(10)
+
+    def add_items_table(self, items):
+        # Table Header
+        self.set_font('Arial', 'B', 12)
+        self.cell(50, 10, 'Item & Description', 1)
+        self.cell(30, 10, 'Qty', 1)
+        self.cell(30, 10, 'Rate', 1)
+        self.cell(30, 10, 'Amount', 1)
+        self.ln()
+        
+        # Table Rows
+        self.set_font('Arial', '', 12)
+        for item, qty, rate, amount in items:
+            self.cell(50, 10, item, 1)
+            self.cell(30, 10, str(qty), 1)
+            self.cell(30, 10, f'{rate:.2f}', 1)
+            self.cell(30, 10, f'{amount:.2f}', 1)
+            self.ln()
+        self.ln(10)
+
+    def add_totals(self, subtotal, total, balance_due):
+        self.set_font('Arial', '', 12)
+        self.cell(50, 10, f'Sub Total: {subtotal:.2f}', ln=1)
+        self.cell(50, 10, f'Total: ${total:.2f}', ln=1)
+        self.cell(50, 10, f'Balance Due: ${balance_due:.2f}', ln=1)
+        self.ln(10)
+
+    def add_notes(self, notes):
+        self.set_font('Arial', 'I', 10)
+        self.multi_cell(0, 10, notes)
+        self.ln(10)
+
+# Create PDF
+pdf = InvoicePDF()
+pdf.add_page()
+
+# Add Invoice Details
+pdf.add_invoice_details(invoice_no="INV-009109", date="2025/02/26", terms="Due On Receipt", due_date="2025/02/26")
+
+# Add Billing Information
+pdf.add_billing_details("Pita Pit Rutland")
+
+# Add Items
+items = [("Iceberg lettuce", 2.00, 38.00, 76.00)]
+pdf.add_items_table(items)
+
+# Add Totals
+pdf.add_totals(subtotal=76.00, total=76.00, balance_due=76.00)
+
+# Add Notes
+notes = """For payments- e-transfer can be done at info@jandtsupplies.ca, cheque can be issued on the name of Jasveer and Tauqeer Supplies Ltd.
+Any questions- Please email us at info@jandtsupplies.ca or call/text us at 2367660940
+
+GST NO. 703861690
+PST NO. PST-1471-4332
+
+Terms & Conditions
+Once received this invoice, please review that all of the items listed have been received, sign it and hand it back to the driver.
+"""
+pdf.add_notes(notes)
+
+# Save PDF
+pdf.output("Invoice.pdf")
