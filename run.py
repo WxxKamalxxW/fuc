@@ -1,5 +1,8 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for, redirect, session
 from flask_mysqldb import MySQL
+from flask_session import Session
+from functools import wraps
+from datetime import timedelta
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -10,6 +13,14 @@ app.config['MYSQL_PASSWORD'] = 'kamal'
 app.config['MYSQL_DB'] = 'login'
 mysql = MySQL(app)
 
+# Session Configuration
+app.config['SECRET_KEY'] = 'kamal'  # Used for encrypting session data
+app.config['SESSION_TYPE'] = 'filesystem'  # Store session data on the server
+app.config['SESSION_PERMANENT'] = True  # Session will end when the browser closes
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Auto logout after 30 minutes
+app.config['SESSION_USE_SIGNER'] = True 
+Session(app)
+
 # Enable CORS for frontend communication
 @app.after_request
 def add_cors_headers(response):
@@ -18,12 +29,55 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
-# Serve frontend
-@app.route("/")
-def home():
-    return render_template("index.html")
+# Helper function to restrict access to logged-in users
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            if request.path.startswith("/api"):  
+                return jsonify({"error": "Unauthorized"}), 401  # API routes return JSON response
+            return redirect(url_for('home'))  # Redirect UI requests
+        return f(*args, **kwargs)
+    return decorated_function
 
-# Fetch categories
+
+# Authentication Routes
+@app.route('/')
+def home():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))  # Redirect to dashboard if logged in
+    return render_template('login.html')  # Otherwise, show the login page
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    session.modified = True
+
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, role FROM users WHERE email = %s AND password = %s", (email, password))
+    user = cur.fetchone()
+    cur.close()
+
+    if user:
+        session['user_id'] = user[0]  # Store user ID in session
+        session['role'] = user[1]  # Store user role in session
+        return jsonify({"status": "success", "role": user[1], "message": "Login successful!"}), 200
+    else:
+        return jsonify({"message": "Invalid credentials!"}), 401
+
+@app.route('/logout')
+def logout():
+    session.clear()  # Clear session data
+    return redirect(url_for('home'))  # Redirect to login page
+
+@app.route('/dashboard')
+@login_required  # Protect the dashboard route
+def dashboard():
+    return render_template('index.html')  # Reuse index.html as dashboard
+
+# E-Commerce API Routes
 @app.route("/api/categories", methods=["GET"])
 def get_categories():
     try:
@@ -35,12 +89,11 @@ def get_categories():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Fetch products with category and search filtering
 @app.route("/api/products", methods=["GET"])
 def get_products():
     category_name = request.args.get("category", "")
     search_query = request.args.get("search", "")
-    user_id = request.args.get("user_id")
+    user_id = session.get('user_id')  # Use logged-in user ID
 
     try:
         cur = mysql.connection.cursor()
@@ -60,26 +113,22 @@ def get_products():
         products = cur.fetchall()
         cur.close()
 
-        return jsonify([
-            {
-                "id": row[0],
-                "name": row[1],
-                "price": float(row[2]) if row[2] is not None else 0.0,
-                "image_path": row[3] if row[3] else "../static/images/default-product.png",
-                "stock": int(row[4]) if row[4] is not None else 0
-            }
-            for row in products
-        ])
+        return jsonify([{
+            "id": row[0],
+            "name": row[1],
+            "price": float(row[2]) if row[2] is not None else 0.0,
+            "image_path": row[3] if row[3] else "../static/images/default-product.png",
+            "stock": int(row[4]) if row[4] is not None else 0
+        } for row in products])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Add product to cart
 @app.route("/add-to-cart", methods=["POST"])
+@login_required
 def add_to_cart():
     try:
         data = request.get_json()
-        print(f"Received data: {data}")  # Add this line to see the data coming in
-        user_id = data.get("user_id", 1)
+        user_id = session['user_id']
         product_id = data.get("product_id")
         quantity = data.get("quantity")
 
@@ -118,15 +167,13 @@ def add_to_cart():
 
         return jsonify({"success": True, "message": "Product added to cart!"}), 200
     except Exception as e:
-        print(f"Error: {str(e)}")  # Log the error
         return jsonify({"error": str(e)}), 500
 
-
-# Fetch user's cart
 @app.route("/cart", methods=["GET"])
+@login_required
 def get_cart():
     try:
-        user_id = request.args.get("user_id", 1)
+        user_id = session['user_id']
         cur = mysql.connection.cursor()
         cur.execute("""
             SELECT c.cart_id, p.name, c.quantity, 
@@ -141,25 +188,21 @@ def get_cart():
         cart_items = cur.fetchall()
         cur.close()
 
-        return jsonify([
-            {
-                "cart_id": row[0],
-                "name": row[1],
-                "quantity": row[2],
-                "price": float(row[3]),
-                "total_price": float(row[4])
-            }
-            for row in cart_items
-        ])
+        return jsonify([{
+            "cart_id": row[0],
+            "name": row[1],
+            "quantity": row[2],
+            "price": float(row[3]),
+            "total_price": float(row[4])
+        } for row in cart_items])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Place order
 @app.route("/place-order", methods=["POST"])
+@login_required
 def place_order():
     try:
-        data = request.get_json()
-        user_id = data.get("user_id")
+        user_id = session['user_id']
 
         cur = mysql.connection.cursor()
 
@@ -190,15 +233,20 @@ def place_order():
             WHERE c.user_id = %s
         """, (order_id, user_id, user_id))
 
-        # Clear cart
+        # Clear cart after order placement
         cur.execute("DELETE FROM cart WHERE user_id = %s", (user_id,))
 
         mysql.connection.commit()
         cur.close()
 
-        return jsonify({"success": True, "message": "Order placed successfully!", "order_id": order_id}), 200
+        return jsonify({"success": True, "redirect_url": url_for('order_success')})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/success")
+@login_required
+def order_success():
+    return render_template("order.html")
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

@@ -514,6 +514,24 @@
 <script src="https://cdn.jsdelivr.net/npm/jarallax@1.12.6/dist/jarallax.min.js"></script>
 
 <!-- Your Script -->
+<script>
+  document.getElementById("checkout-btn").addEventListener("click", function () {
+      fetch("/place-order", { 
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: 1 }) // Replace with actual user_id dynamically if needed
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              window.location.href = data.redirect_url; // Redirect to success page
+          } else {
+              alert(data.error); // Show error if any
+          }
+      })
+      .catch(error => console.error("Error:", error));
+  });
+</script>
 
     <script src="../static/js/jquery-1.11.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>

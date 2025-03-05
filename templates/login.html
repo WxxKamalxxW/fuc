@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Login | JandT</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+    <div class="background">
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+    <form id="login-form">
+        <h3>Login Here</h3>
+
+        <label for="email-input">Email</label>
+        <input type="text" placeholder="Enter your email" id="email-input" required>
+
+        <label for="password-input">Password</label>
+        <input type="password" placeholder="Enter your password" id="password-input" required>
+            <p id="error-message" style="color: red; font-size: 14px; display: none;">Please enter correct information.</p>
+
+        <button type="submit" class="login">Log In</button>
+
+    </form>
+
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>
