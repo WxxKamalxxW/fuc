@@ -70,7 +70,12 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()  # Clear session data
-    return redirect(url_for('home'))  # Redirect to login page
+
+    # Expire the session cookie
+    response = redirect(url_for('home'))
+    response.set_cookie('session', '', expires=0)  # Expire session cookie
+    return response
+
 
 @app.route('/dashboard')
 @login_required  # Protect the dashboard route
@@ -247,6 +252,52 @@ def place_order():
 @login_required
 def order_success():
     return render_template("order.html")
+@app.route('/orders', methods=['GET'])
+@login_required
+def orders_page():
+    return render_template('ordera.html')  # Render the orders.html page
+
+@app.route('/api/orders', methods=['GET'])
+@login_required
+def get_orders_api():
+    user_id = session['user_id']
+
+    cur = mysql.connection.cursor()
+    query = """
+        SELECT o.order_id, o.status, o.created_at, 
+               p.name, oi.price_at_time, oi.quantity, p.tax_applicable
+        FROM orders o
+        INNER JOIN order_items oi ON o.order_id = oi.order_id
+        INNER JOIN products p ON oi.product_id = p.id
+        WHERE o.user_id = %s
+        ORDER BY o.created_at DESC;
+    """
+    cur.execute(query, (user_id,))
+    data = cur.fetchall()
+    cur.close()
+
+    if not data:
+        return jsonify([])  # Return empty list if no orders found
+
+    orders = {}
+    for row in data:
+        order_id, status, created_at, product_name, price_at_time, quantity, tax_applicable = row
+        if order_id not in orders:
+            orders[order_id] = {
+                'order_id': order_id,
+                'status': status,
+                'created_at': created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'items': []
+            }
+        orders[order_id]['items'].append({
+            'name': product_name,
+            'price': float(price_at_time),
+            'quantity': quantity,
+            'tax_applicable': bool(tax_applicable)
+        })
+
+    return jsonify(list(orders.values()))
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

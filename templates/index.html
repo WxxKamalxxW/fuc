@@ -163,12 +163,17 @@
                       <h5 class="mb-0">+437-9333370</h5>
                   </div>
                   <div class="d-flex gap-3">
-                      <a href="#" class="rounded-circle bg-light p-2">
-                          <svg width="24" height="24" viewBox="0 0 24 24"><use xlink:href="#user"></use></svg>
-                      </a>
-                      <a href="#" class="rounded-circle bg-light p-2">
-                          <svg width="24" height="24" viewBox="0 0 24 24"><use xlink:href="#heart"></use></svg>
-                      </a>
+                    <a href="/orders" class="rounded-circle bg-light p-2">
+                      <svg width="24" height="24" viewBox="0 0 24 24">
+                          <use xlink:href="#user"></use>
+                      </svg>
+                  </a>
+                  
+                  
+                  <a href="#" id="logout-btn" class="rounded-circle bg-light p-2">
+                    <img src="../static/images/chocolat/logout_icon_138409.png" width="24" height="24" alt="Logout">
+                </a>
+                
                       <a href="#" class="rounded-circle bg-light p-2 position-relative" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCart" aria-controls="offcanvasCart">
                         <svg width="24" height="24" viewBox="0 0 24 24"><use xlink:href="#cart"></use></svg>
                         
@@ -532,6 +537,22 @@
       .catch(error => console.error("Error:", error));
   });
 </script>
+
+<script>
+  document.getElementById('logout-btn').addEventListener('click', function(event) {
+      event.preventDefault(); // Prevent default link behavior
+
+      fetch('/logout', {
+          method: 'GET',
+          credentials: 'include' // Ensure cookies are sent with the request
+      })
+      .then(response => {
+          window.location.href = "/"; // Redirect to login page
+      })
+      .catch(error => console.error('Logout failed:', error));
+  });
+</script>
+
 
     <script src="../static/js/jquery-1.11.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
